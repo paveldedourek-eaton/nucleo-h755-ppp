@@ -1,0 +1,17 @@
+/*
+ * Enable USART2 on PD5 (TX) / PD6 (RX) for PPP link.
+ * Connect these pins to a host running pppd via a USB-to-UART adapter.
+ */
+
+&usart2 {
+	pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+/ {
+	chosen {
+		zephyr,ppp-uart = &usart2;
+	};
+};

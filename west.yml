@@ -1,0 +1,22 @@
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v3.7.1
+      import:
+        name-allowlist:
+          - cmsis
+          - hal_stm32
+          - picolibc
+
+    - name: custom_boards
+      url: https://github.com/user/custom_boards  # TODO: replace with your repo URL
+      revision: main
+      path: custom_boards
+
+  self:
+    path: app

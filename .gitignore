@@ -1,0 +1,9 @@
+.venv/
+build/
+zephyr/
+modules/
+custom_boards/
+bootloader/
+tools/
+*.pyc
+__pycache__/
