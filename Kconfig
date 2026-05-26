@@ -1,0 +1,21 @@
+menu "Application"
+
+config APP_ECHO_SERVER
+	bool "Run as UDP echo server"
+	default n
+	help
+	  When enabled, the board listens on UDP port 7780 and echoes
+	  received packets back to the sender. When disabled, the board
+	  sends UDP echo packets to the peer address.
+
+config APP_MY_IPV4_ADDR
+	string "Local IPv4 address"
+	default "192.168.1.1"
+
+config APP_PEER_IPV4_ADDR
+	string "Peer IPv4 address"
+	default "192.168.1.2"
+
+endmenu
+
+source "Kconfig.zephyr"

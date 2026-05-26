@@ -1,6 +1,6 @@
 /*
  * Enable USART2 on PD5 (TX) / PD6 (RX) for PPP link.
- * Connect these pins to a host running pppd via a USB-to-UART adapter.
+ * Cross-connect TX/RX between two boards (Board A PD5 → Board B PD6, etc).
  */
 
 &usart2 {
