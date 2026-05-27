@@ -1,6 +1,7 @@
 /*
- * Enable USART2 on PD5 (TX) / PD6 (RX) for PPP link.
+ * Enable USART2 on PD5 (TX) / PD6 (RX) for PPP link over IrDA SIR.
  * Cross-connect TX/RX between two boards (Board A PD5 → Board B PD6, etc).
+ * IrDA mode (IREN bit) is enabled at runtime in main.c.
  */
 
 &usart2 {

@@ -8,9 +8,9 @@
  *
  * Build:
  *   Board A: west build -b nucleo_h755zi_q/stm32h755xx/m7 \
- *              -- -DEXTRA_CONF_FILE=overlay-client.conf
+ *              -- -DEXTRA_CONF_FILE=overlay-board-a.conf
  *   Board B: west build -b nucleo_h755zi_q/stm32h755xx/m7 \
- *              -- -DEXTRA_CONF_FILE=overlay-server.conf
+ *              -- -DEXTRA_CONF_FILE=overlay-board-b.conf
  */
 
 #include <zephyr/kernel.h>
@@ -21,8 +21,55 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/ppp.h>
 #include <zephyr/shell/shell.h>
+#include <soc.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define PPP_UART_NODE DT_CHOSEN(zephyr_ppp_uart)
+
+/*
+ * Enable IrDA SIR mode on the PPP UART via SYS_INIT, so it takes
+ * effect before the PPP/network stack starts using the UART.
+ * Runs at POST_KERNEL priority 99 — after UART driver init (~50)
+ * but before APPLICATION-level network init.
+ */
+
+/*
+IrDA mode is selected by setting the IREN bit in the USART_CR3 register. In IrDA mode,
+the following bits must be kept cleared:
+- LINEN, STOP and CLKEN bits in the USART_CR2 register,
+- SCEN and HDSEL bits in the USART_CR3 register.
+*/
+static int enable_irda_init(void)
+{
+	USART_TypeDef *usart = (USART_TypeDef *)DT_REG_ADDR(PPP_UART_NODE);
+
+	/* Disable USART before modifying configuration */
+	usart->CR1 &= ~USART_CR1_UE;
+
+	/* IrDA ref-manual requirements:
+	 *   CR2: LINEN=0, STOP=00, CLKEN=0
+	 *   CR3: SCEN=0, HDSEL=0, IREN=1
+	 */
+	usart->CR2 &= ~(USART_CR2_LINEN | USART_CR2_STOP | USART_CR2_CLKEN);
+	usart->CR3 = (usart->CR3 & ~(USART_CR3_SCEN | USART_CR3_HDSEL))
+		      | USART_CR3_IREN;
+
+	/* Normal IrDA mode: PSC must be 0x01 */
+	usart->GTPR = (usart->GTPR & 0xFF00U) | 0x01U;
+
+	/* Re-enable USART */
+	usart->CR1 |= USART_CR1_UE;
+
+	printk("IrDA SIR enabled: CR1=0x%08x CR2=0x%08x CR3=0x%08x "
+	       "BRR=0x%08x GTPR=0x%08x\n",
+	       usart->CR1, usart->CR2, usart->CR3,
+	       usart->BRR, usart->GTPR);
+
+	return 0;
+}
+
+SYS_INIT(enable_irda_init, POST_KERNEL, 99);
 
 #define SLEEP_TIME_MS    1000
 #define LED0_NODE        DT_ALIAS(led0)
@@ -120,10 +167,6 @@ static void udp_echo_test(void)
 		return;
 	}
 
-	/* Set receive timeout */
-	struct zsock_timeval tv = { .tv_sec = 5, .tv_usec = 0 };
-	zsock_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
 	printk("Starting UDP echo test to %s:%d\n",
 	       CONFIG_APP_PEER_IPV4_ADDR, ECHO_PORT);
 
@@ -133,28 +176,44 @@ static void udp_echo_test(void)
 		/* Fill buffer with pattern */
 		memset(tx_buf, (uint8_t)(i + 1), sizeof(tx_buf));
 
+		printk("  Pkt %d: sending...\n", i + 1);
 		ret = zsock_sendto(sock, tx_buf, sizeof(tx_buf), 0,
 				   (struct sockaddr *)&addr, sizeof(addr));
 		if (ret < 0) {
-			printk("  Packet %d: send failed (%d)\n", i + 1, errno);
+			printk("  Pkt %d: send failed (%d)\n", i + 1, errno);
+			continue;
+		}
+		printk("  Pkt %d: sent %d, waiting...\n", i + 1, ret);
+
+		/* Use poll() for recv timeout — SO_RCVTIMEO unreliable */
+		struct zsock_pollfd fds = {
+			.fd = sock, .events = ZSOCK_POLLIN
+		};
+		int poll_rc = zsock_poll(&fds, 1, 5000);
+
+		if (poll_rc <= 0) {
+			printk("  Pkt %d: recv timeout\n", i + 1);
 			continue;
 		}
 
-		ret = zsock_recv(sock, rx_buf, sizeof(rx_buf), 0);
+		ret = zsock_recv(sock, rx_buf, sizeof(rx_buf), ZSOCK_MSG_DONTWAIT);
 		if (ret < 0) {
-			printk("  Packet %d: recv timeout\n", i + 1);
+			printk("  Pkt %d: recv error (%d)\n", i + 1, errno);
 			continue;
 		}
 
 		if (ret == sizeof(tx_buf) &&
 		    memcmp(tx_buf, rx_buf, sizeof(tx_buf)) == 0) {
 			success++;
-			printk("  Packet %d: echo OK (%d bytes)\n",
+			printk("  Pkt %d: echo OK (%d bytes)\n",
 			       i + 1, ret);
 		} else {
-			printk("  Packet %d: mismatch (got %d bytes)\n",
+			printk("  Pkt %d: mismatch (got %d bytes)\n",
 			       i + 1, ret);
 		}
+
+		/* Half-duplex: small gap between packets */
+		k_msleep(100);
 	}
 
 	printk("Echo test done: %d/%d packets OK\n", success, ECHO_PACKETS);
@@ -264,13 +323,21 @@ int main(void)
 	printk("PPP interface found: %s\n",
 	       net_if_get_device(ppp_iface)->name);
 
-	/* Set local IP on the PPP interface before bringing it up.
-	 * IPCP will propose this address to the peer during negotiation.
-	 */
 	struct in_addr my_addr;
 
 	zsock_inet_pton(AF_INET, CONFIG_APP_MY_IPV4_ADDR, &my_addr);
+
+	/* Set IPCP proposed address so PPP negotiates the correct IP
+	 * (otherwise IPCP proposes 0.0.0.0).
+	 */
+	struct ppp_context *ctx = net_if_l2_data(ppp_iface);
+
+	memcpy(&ctx->ipcp.my_options.address, &my_addr, sizeof(my_addr));
+
+	/* Also add it to the interface for routing */
 	net_if_ipv4_addr_add(ppp_iface, &my_addr, NET_ADDR_MANUAL, 0);
+
+	printk("IrDA SIR mode enabled on USART2\n");
 
 	/* Bring up the PPP interface — LCP/IPCP negotiation starts */
 	net_if_up(ppp_iface);
@@ -284,14 +351,32 @@ int main(void)
 	       CONFIG_APP_PEER_IPV4_ADDR, ECHO_PORT);
 #endif
 
-	printk("Waiting for PPP link...\n");
+	printk("Waiting for PPP link (phase RUNNING)...\n");
 
-	/* Wait for L4 connectivity (IPCP done, IP assigned) */
-	k_event_wait(&ppp_events, EVENT_L4_CONNECTED, false, K_FOREVER);
-	printk("PPP link established\n");
+	/* Wait for PPP to reach RUNNING phase (IPCP fully negotiated).
+	 * Do NOT rely on L4_CONNECTED — it fires prematurely from the
+	 * manual IP add above, before IPCP actually completes.
+	 */
+	int ppp_wait = 90;
 
-	/* Give the link a moment to settle */
-	k_msleep(1000);
+	while (ctx->phase != PPP_RUNNING && ppp_wait > 0) {
+		k_msleep(1000);
+		ppp_wait--;
+		if (ppp_wait % 10 == 0) {
+			printk("  PPP phase=%d  IPCP state=%d  retransmits=%d\n",
+			       ctx->phase, ctx->ipcp.fsm.state,
+			       ctx->ipcp.fsm.retransmits);
+		}
+	}
+
+	if (ctx->phase != PPP_RUNNING) {
+		printk("PPP failed to reach RUNNING (phase=%d)\n", ctx->phase);
+	}
+
+	printk("PPP link established (phase=%d)\n", ctx->phase);
+
+	/* Give the link and the peer's echo server time to start */
+	k_msleep(3000);
 
 #ifdef CONFIG_APP_ECHO_SERVER
 	/* Echo server runs forever */
