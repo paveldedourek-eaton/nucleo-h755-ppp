@@ -1,16 +1,19 @@
-# NUCLEO-H755ZI-Q PPP — Board-to-Board
+# NUCLEO-H755ZI-Q PPP over IrDA — Board-to-Board
 
-Two STM32 Nucleo H755ZI-Q boards connected over UART PPP. One board runs as a UDP echo server, the other as a client that sends packets and verifies the replies.
+Two STM32 Nucleo H755ZI-Q boards connected over UART PPP using IrDA SIR (Serial Infrared) encoding on USART2. One board runs as a UDP echo server, the other as a client that sends packets and verifies the replies.
+
+The STM32H755 USART peripheral supports IrDA SIR mode natively. Instead of standard UART levels, it uses short pulses (3/16 of a bit period) for encoding. This is enabled at runtime by setting the `IREN` bit in the USART CR3 register.
 
 ## Hardware Setup
 
 Cross-connect USART2 between the two boards:
 
 | Signal | Board A Pin       | Board B Pin       | Morpho             |
-|--------|-------------------|-------------------|---------------------|
+|--------|-------------------|-------------------|--------------------|
 | TX→RX  | PD5 (USART2 TX)   | PD6 (USART2 RX)   | CN9-6 → CN9-4      |
 | RX←TX  | PD6 (USART2 RX)   | PD5 (USART2 TX)   | CN9-4 → CN9-6      |
-| GND    | GND               | GND               | CN9-12              |
+| GND    | GND               | GND               | CN9-12             |
+| +5V    |                   |                   | CN8-9              |
 
 The ST-Link VCP (USART3) on each board remains available for the Zephyr shell console at 115200 baud.
 
@@ -20,7 +23,7 @@ The ST-Link VCP (USART3) on each board remains available for the Zephyr shell co
 
 ```bash
 west build -b nucleo_h755zi_q/stm32h755xx/m7 \
-    -- -DEXTRA_CONF_FILE=overlay-client.conf
+    -- -DEXTRA_CONF_FILE=overlay-board-a.conf
 west flash
 ```
 
@@ -28,7 +31,7 @@ west flash
 
 ```bash
 west build -b nucleo_h755zi_q/stm32h755xx/m7 \
-    -- -DEXTRA_CONF_FILE=overlay-server.conf
+    -- -DEXTRA_CONF_FILE=overlay-board-b.conf
 west flash
 ```
 
@@ -40,7 +43,7 @@ west flash
 | Board A | Echo client  | 192.168.1.1   |
 | Board B | Echo server  | 192.168.1.2   |
 
-Addresses are proposed via IPCP negotiation. Each board's address comes from the overlay conf file (`CONFIG_NET_CONFIG_MY_IPV4_ADDR`).
+Addresses are proposed via IPCP negotiation. Each board's address comes from the overlay conf file (`CONFIG_APP_MY_IPV4_ADDR`).
 
 ## What Happens
 
@@ -86,8 +89,8 @@ Reply (100 bytes): abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
 ├── CMakeLists.txt
 ├── Kconfig                                            — App Kconfig (echo server toggle)
 ├── prj.conf                                           — Common Kconfig (PPP, networking, shell)
-├── overlay-client.conf                                — Board A: echo client, 192.168.1.1
-├── overlay-server.conf                                — Board B: echo server, 192.168.1.2
+├── overlay-board-a.conf                               — Board A: echo client, 192.168.1.1
+├── overlay-board-b.conf                               — Board B: echo server, 192.168.1.2
 ├── boards/
 │   ├── nucleo_h755zi_q_stm32h755xx_m7.conf            — Board-specific Kconfig
 │   └── nucleo_h755zi_q_stm32h755xx_m7.overlay         — DTS overlay (USART2 for PPP)
