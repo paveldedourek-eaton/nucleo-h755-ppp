@@ -11,14 +11,14 @@ STLINK_BOARD_B="004700383235510937333439"
 set -e
 
 echo "=== Building Board A (echo client) ==="
-west build -b nucleo_h755zi_q/stm32h755xx/m7 -d build_a \
+west build -b nucleo_h745zi_q/stm32h745xx/m7 -d build_a \
     -- -DEXTRA_CONF_FILE=overlay-board-a.conf
 
 echo "=== Flashing Board A (ST-Link ${STLINK_BOARD_A}) ==="
 west flash -d build_a --cmd-pre-init "hla_serial ${STLINK_BOARD_A}"
 
 echo "=== Building Board B (echo server) ==="
-west build -b nucleo_h755zi_q/stm32h755xx/m7 -d build_b \
+west build -b nucleo_h745zi_q/stm32h745xx/m7 -d build_b \
     -- -DEXTRA_CONF_FILE=overlay-board-b.conf
 
 echo "=== Flashing Board B (ST-Link ${STLINK_BOARD_B}) ==="

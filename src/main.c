@@ -1,5 +1,5 @@
 /*
- * NUCLEO-H755ZI-Q PPP Demo — Board-to-Board
+ * NUCLEO-H745ZI-Q PPP Demo — Board-to-Board
  *
  * Two Nucleo boards connected via UART PPP (USART2 PD5/PD6 cross-wired).
  *
@@ -7,9 +7,9 @@
  * Board B (server): echoes received UDP packets back
  *
  * Build:
- *   Board A: west build -b nucleo_h755zi_q/stm32h755xx/m7 \
+ *   Board A: west build -b nucleo_h745zi_q/stm32h745xx/m7 \
  *              -- -DEXTRA_CONF_FILE=overlay-board-a.conf
- *   Board B: west build -b nucleo_h755zi_q/stm32h755xx/m7 \
+ *   Board B: west build -b nucleo_h745zi_q/stm32h745xx/m7 \
  *              -- -DEXTRA_CONF_FILE=overlay-board-b.conf
  */
 

@@ -1,8 +1,8 @@
-# NUCLEO-H755ZI-Q PPP over IrDA — Board-to-Board
+# NUCLEO-H745ZI-Q PPP over IrDA — Board-to-Board
 
-Two STM32 Nucleo H755ZI-Q boards connected over UART PPP using IrDA SIR (Serial Infrared) encoding on USART2. One board runs as a UDP echo server, the other as a client that sends packets and verifies the replies.
+Two STM32 Nucleo H745ZI-Q boards connected over UART PPP using IrDA SIR (Serial Infrared) encoding on USART2. One board runs as a UDP echo server, the other as a client that sends packets and verifies the replies.
 
-The STM32H755 USART peripheral supports IrDA SIR mode natively. Instead of standard UART levels, it uses short pulses (3/16 of a bit period) for encoding. This is enabled at runtime by setting the `IREN` bit in the USART CR3 register.
+The STM32H745 USART peripheral supports IrDA SIR mode natively. Instead of standard UART levels, it uses short pulses (3/16 of a bit period) for encoding. This is enabled at runtime by setting the `IREN` bit in the USART CR3 register.
 
 ## Hardware Setup
 
@@ -22,16 +22,14 @@ The ST-Link VCP (USART3) on each board remains available for the Zephyr shell co
 ### Board A — echo client
 
 ```bash
-west build -b nucleo_h755zi_q/stm32h755xx/m7 \
-    -- -DEXTRA_CONF_FILE=overlay-board-a.conf
+west build -b nucleo_h745zi_q/stm32h745xx/m7 -- -DEXTRA_CONF_FILE=overlay-board-a.conf
 west flash
 ```
 
 ### Board B — echo server (flash first)
 
 ```bash
-west build -b nucleo_h755zi_q/stm32h755xx/m7 \
-    -- -DEXTRA_CONF_FILE=overlay-board-b.conf
+west build -b nucleo_h745zi_q/stm32h745xx/m7 -- -DEXTRA_CONF_FILE=overlay-board-b.conf
 west flash
 ```
 
@@ -92,8 +90,8 @@ Reply (100 bytes): abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
 ├── overlay-board-a.conf                               — Board A: echo client, 192.168.1.1
 ├── overlay-board-b.conf                               — Board B: echo server, 192.168.1.2
 ├── boards/
-│   ├── nucleo_h755zi_q_stm32h755xx_m7.conf            — Board-specific Kconfig
-│   └── nucleo_h755zi_q_stm32h755xx_m7.overlay         — DTS overlay (USART2 for PPP)
+│   ├── nucleo_h745zi_q_stm32h745xx_m7.conf            — Board-specific Kconfig
+│   └── nucleo_h745zi_q_stm32h745xx_m7.overlay         — DTS overlay (USART2 for PPP)
 ├── src/
 │   └── main.c                                         — PPP application (client + server)
 └── server/
